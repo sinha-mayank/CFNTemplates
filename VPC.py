@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-#Author : Mayank Sinha
+#Author : Mayank Sinha  
 #Email	: sinha_mayank@hotmail.com
 
 # Creating a sample template using python troposphere library
