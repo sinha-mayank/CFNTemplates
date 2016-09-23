@@ -5,7 +5,22 @@
 
 # Creating a sample template using python troposphere library
 
-from troposphere import Base64, GetAtt, Equals
+'''
+This script will create -
+
+1 VPC 
+Option for two AvailabilityZones
+Each AvailabilityZone having option of 1 Public Subnet and 2 Private Subnets 
+* By default a Public Subnet will be created in AvailabilityZone 1
+For each Private Subnet in each AvailabilityZone, Internet access is provided using NAT Gateway
+For every additional Private subnet NACL is created with a default value of incoming from 0.0.0.0/0, which can be changed to desired CIDR 
+If value is left as "false" in Parameter section then specified resource will not be created
+
+
+'''
+
+
+from troposphere import Base64, GetAtt, Equals, And, Or, Condition
 from troposphere import Parameter, Output, Ref, Template, Tags, Join
 import troposphere.ec2 as ec2
 
@@ -78,7 +93,76 @@ parameters = {
 					Default = "10.0.192.0/21",
 					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
 
+									),
+
+	"AvailabilityZone2" : Parameter(
+
+					"AvailabilityZone2",
+					Description = "Select the second AvailabilityZone",
+					Type = "String",
+					Default = "ap-south-1b"
+
+									),
+
+	"CreatePublicSubnet2" : Parameter(
+
+					"CreatePublicSubnet2",
+					Description = "Select True or False, for creating Public Subnet 2 in AZ2",
+					Type = "String",
+					AllowedValues = ["True","False"],
+					Default = "False"
+
+									),
+
+	"CIDRPublicSubnet2" : Parameter(
+
+					"CIDRPublicSubnet2",
+					Description = "Enter the CIDR range for PublicSubnet2 in AZ2",
+					Type = "String",
+					Default = "10.0.144.0/20",
+					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+
+									),
+
+	"CreatePrivateSubnet2A" : Parameter(
+
+					"CreatePrivateSubnet2A",
+					Description = "Select True or False, for creating Private Subnet 2A in AZ2",
+					Type = "String",
+					AllowedValues = ["True","False"],
+					Default = "False"
+										),
+
+	"CIDRPrivateSubnet2A" : Parameter(
+
+					"CIDRPrivateSubnet2A",
+					Description = "Enter the CIDR block for Private Subnet 2A",
+					Type = "String",
+					Default = "10.0.32.0/19",
+					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+
+									),
+
+	"CreatePrivateSubnet2B" : Parameter(
+
+					"CreatePrivateSubnet2B",
+					Description = "Select True or False, for creating Private Subnet 2B in AZ2",
+					Type = "String",
+					AllowedValues = ["True","False"],
+					Default = "False"
+
+										),
+
+	"CIDRPrivateSubnet2B" : Parameter(
+
+					"CIDRPrivateSubnet2B",
+					Description = "Enter the CIDR block for Private Subnet 2B",
+					Type = "String",
+					Default = "10.0.200.0/21",
+					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+
 									)
+
 
 
 			}
@@ -86,7 +170,15 @@ parameters = {
 conditions = {
 	
 	"CreatePrivateSubnet1ACondition" : Equals(Ref("CreatePrivateSubnet1A"),"True"),
-	"CreatePrivateSubnet1BCondition" : Equals(Ref("CreatePrivateSubnet1B"),"True")
+	"CreatePrivateSubnet1BCondition" : Equals(Ref("CreatePrivateSubnet1B"),"True"),
+
+	"CreatePublicSubnet2Condition" : Equals(Ref("CreatePublicSubnet2"),"True"),
+	"CreatePrivateSubnet2ACondition" : Equals(Ref("CreatePrivateSubnet2A"),"True"),
+	"CreatePrivateSubnet2BCondition" : Equals(Ref("CreatePrivateSubnet2B"),"True"),
+	"AttachNAT2ACondition" : And(Condition("CreatePublicSubnet2Condition"),Condition("CreatePrivateSubnet2ACondition")),
+	"AttachNAT2BCondition" : And(Condition("CreatePublicSubnet2Condition"),Condition("CreatePrivateSubnet2BCondition")),
+	"NAT2EIPCondition" : Or(Condition("AttachNAT2ACondition"),Condition("AttachNAT2BCondition"))
+
 
 
 
@@ -364,7 +456,218 @@ resources = {
 						SubnetId = Ref("PrivateSubnet1B"),
 						NetworkAclId = Ref("PrivateSubnet1BNetworkAcl")
 
+																			),
+
+#Create Public Subnet 2 in AZ2
+
+"PublicSubnet2" : ec2.Subnet(
+
+					"PublicSubnet2",
+					Condition = "CreatePublicSubnet2Condition",
+					CidrBlock = Ref("CIDRPublicSubnet2"),
+					VpcId = Ref("VPC"),
+					AvailabilityZone = Ref("AvailabilityZone2"),
+					MapPublicIpOnLaunch = "True",
+					Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PublicSubnet2"])
+
+								)
+
+								),
+
+# Associate PublicSubnet2 to route table
+
+	"AttachPublicSubnet2toRouteTable" : ec2.SubnetRouteTableAssociation(
+
+						"AttachPublicSubnet2toRouteTable",
+						Condition = "CreatePublicSubnet2Condition",
+						SubnetId = Ref("PublicSubnet2"),
+						RouteTableId = Ref("PublicSubnetRouteTable")
+
+
+																		),
+# Create Private Subnet 2A
+
+	"PrivateSubnet2A" : ec2.Subnet(
+
+						"PrivateSubnet2A",
+						Condition = "CreatePrivateSubnet2ACondition",
+						VpcId = Ref("VPC"),
+						AvailabilityZone = Ref("AvailabilityZone2"),
+						CidrBlock = Ref("CIDRPrivateSubnet2A"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet2A"])
+
+								)
+
+								),
+
+# Create NAT2 Elsatic IP
+
+	"NAT2EIP" : ec2.EIP(
+
+						"NAT2EIP",
+						Condition = "NAT2EIPCondition",
+						DependsOn = "IGWAttachVPC",
+						Domain = "vpc"
+
+						),
+# Create NAT  Gateway 2
+
+	"NATGateway2" : ec2.NatGateway(
+
+
+						"NATGateway2",
+						DependsOn = "IGWAttachVPC",
+						Condition = "NAT2EIPCondition",
+						SubnetId = Ref("PublicSubnet2"),
+						AllocationId = GetAtt("NAT2EIP","AllocationId")
+
+								),
+# Private Subnet 2A route Table
+
+	"PrivateSubnet2ARouteTable" : ec2.RouteTable(
+
+						"PrivateSubnet2ARouteTable",
+						Condition = "AttachNAT2ACondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet2ARouteTable"])
+
+								)
+
+
+												),
+# Create route in PrivateSubnet2A Route Table
+
+	"PrivateSubnet2ARoute" : ec2.Route(
+
+						"PrivateSubnet2ARoute",
+						Condition = "AttachNAT2ACondition",
+						DependsOn = "PrivateSubnet2ARouteTable",
+						RouteTableId = Ref("PrivateSubnet2ARouteTable"),
+						DestinationCidrBlock = "0.0.0.0/0",
+						NatGatewayId = Ref("NATGateway2")
+
+									),
+# Associate private subnet 2A with the route table
+
+	"PrivateSubnet2ARouteTableAssociation" : ec2.SubnetRouteTableAssociation(
+
+						"PrivateSubnet2ARouteTableAssociation",
+						Condition = "AttachNAT2ACondition",
+						DependsOn = "PrivateSubnet2ARoute",
+						SubnetId = Ref("PrivateSubnet2A"),
+						RouteTableId = Ref("PrivateSubnet2ARouteTable")	
+
+
+																			),
+
+# Create Private Subnet 2B
+
+	"PrivateSubnet2B" : ec2.Subnet(
+
+						"PrivateSubnet2B",
+						Condition = "CreatePrivateSubnet2BCondition",
+						VpcId = Ref("VPC"),
+						AvailabilityZone = Ref("AvailabilityZone2"),
+						CidrBlock = Ref("CIDRPrivateSubnet2B"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet2B"])
+
+								)
+
+								),
+
+# Private Subnet 2B route Table
+
+	"PrivateSubnet2BRouteTable" : ec2.RouteTable(
+
+						"PrivateSubnet2BRouteTable",
+						Condition = "AttachNAT2BCondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet2BRouteTable"])
+
+								)
+
+												),
+# Create route in PrivateSubnet2B Route Table
+
+	"PrivateSubnet2BRoute" : ec2.Route(
+
+						"PrivateSubnet2BRoute",
+						Condition = "AttachNAT2BCondition",
+						DependsOn = "PrivateSubnet2BRouteTable",
+						RouteTableId = Ref("PrivateSubnet2BRouteTable"),
+						DestinationCidrBlock = "0.0.0.0/0",
+						NatGatewayId = Ref("NATGateway2")
+
+									),
+# Associate private subnet 2B with the route table
+
+	"PrivateSubnet2BRouteTableAssociation" : ec2.SubnetRouteTableAssociation(
+
+						"PrivateSubnet2BRouteTableAssociation",
+						Condition = "AttachNAT2BCondition",
+						DependsOn = "PrivateSubnet2BRoute",
+						SubnetId = Ref("PrivateSubnet2B"),
+						RouteTableId = Ref("PrivateSubnet2ARouteTable")	
+
+
+																			),
+# Create A NACL for Private Subnet 2B
+
+	"PrivateSubnet2BNetworkAcl" : ec2.NetworkAcl(
+
+						"PrivateSubnet2BNetworkAcl",
+						Condition = "CreatePrivateSubnet2BCondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"NACLPrivateSubnet2B"])
+
+								)
+
+
+												),
+# Create Inbound rules for NACL connected to Private Subnet 2B
+
+	"PrivateSubnet2BNetworkAclEntryInbound" : ec2.NetworkAclEntry(
+
+						"PrivateSubnet2BNetworkAclEntryInbound",
+						Condition = "CreatePrivateSubnet2BCondition",
+						CidrBlock = "0.0.0.0/0",
+						Egress = "true",
+						NetworkAclId = Ref("PrivateSubnet2BNetworkAcl"),
+						Protocol = "-1",
+						RuleAction = "allow",
+						RuleNumber = "100"
+
+																),
+
+# Associate the created NACL with the Private Subnet 2B
+
+	"PrivateSubnet2BNetworkAclAssociation" : ec2.SubnetNetworkAclAssociation(
+
+						"PrivateSubnet2BNetworkAclAssociation",
+						Condition = "CreatePrivateSubnet2BCondition",
+						SubnetId = Ref("PrivateSubnet2B"),
+						NetworkAclId = Ref("PrivateSubnet2BNetworkAcl")
+
 																			)
+
 
 
 			}
