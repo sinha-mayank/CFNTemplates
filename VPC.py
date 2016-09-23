@@ -27,7 +27,7 @@ parameters = {
 					"AvailabilityZone1",
 					Description = "Select the first AvailabilityZone",
 					Type = "String",
-					Default = "us-west-2a"
+					Default = "ap-south-1a"
 
 									),
 
@@ -205,9 +205,47 @@ resources = {
 						SubnetId = Ref("PublicSubnet1"),
 						AllocationId = GetAtt("NAT1EIP","AllocationId")
 
+								),
+# Private Subnet 1A route Table
+
+	"PrivateSubnet1ARouteTable" : ec2.RouteTable(
+
+						"PrivateSubnet1ARouteTable",
+						Condition = "CreatePrivateSubnet1ACondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet1ARouteTable"])
+
 								)
 
 
+												),
+# Create route in PrivateSubnet1A Route Table
+
+	"PrivateSubnet1ARoute" : ec2.Route(
+
+						"PrivateSubnet1ARoute",
+						Condition = "CreatePrivateSubnet1ACondition",
+						DependsOn = "PrivateSubnet1ARouteTable",
+						RouteTableId = Ref("PrivateSubnet1ARouteTable"),
+						DestinationCidrBlock = "0.0.0.0/0",
+						NatGatewayId = Ref("NATGateway1")
+
+									),
+# Associate private subnet 1A with the route table
+
+	"PrivateSubnet1ARouteTableAssociation" : ec2.SubnetRouteTableAssociation(
+
+						"PrivateSubnet1ARouteTableAssociation",
+						Condition = "CreatePrivateSubnet1ACondition",
+						DependsOn = "PrivateSubnet1ARoute",
+						SubnetId = Ref("PrivateSubnet1A"),
+						RouteTableId = Ref("PrivateSubnet1ARouteTable")	
+
+
+																			)
 			}
 
 

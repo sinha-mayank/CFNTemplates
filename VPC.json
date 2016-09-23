@@ -11,7 +11,7 @@
     },
     "Parameters": {
         "AvailabilityZone1": {
-            "Default": "us-west-2a",
+            "Default": "ap-south-1a",
             "Description": "Select the first AvailabilityZone",
             "Type": "String"
         },
@@ -151,6 +151,64 @@
                 }
             },
             "Type": "AWS::EC2::Subnet"
+        },
+        "PrivateSubnet1ARoute": {
+            "Condition": "CreatePrivateSubnet1ACondition",
+            "DependsOn": "PrivateSubnet1ARouteTable",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NATGateway1"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateSubnet1ARouteTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "PrivateSubnet1ARouteTable": {
+            "Condition": "CreatePrivateSubnet1ACondition",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "IoCluster",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "AWS::StackName"
+                                    },
+                                    "PrivateSubnet1ARouteTable"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
+        },
+        "PrivateSubnet1ARouteTableAssociation": {
+            "Condition": "CreatePrivateSubnet1ACondition",
+            "DependsOn": "PrivateSubnet1ARoute",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateSubnet1ARouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PrivateSubnet1A"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
         },
         "PublicSubnet1": {
             "Properties": {
