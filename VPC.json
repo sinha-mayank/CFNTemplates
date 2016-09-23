@@ -8,6 +8,44 @@
         }
     },
     "Resources": {
+        "IGW": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "IoCluster",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "AWS::StackName"
+                                    },
+                                    "IGW"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            },
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "IGWAttachVPC": {
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "IGW"
+                },
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::VPCGatewayAttachment"
+        },
         "VPC": {
             "Properties": {
                 "CidrBlock": {
@@ -15,6 +53,7 @@
                 },
                 "EnableDnsHostnames": "true",
                 "EnableDnsSupport": "true",
+                "InstanceTenancy": "default",
                 "Tags": [
                     {
                         "Key": "IoCluster",

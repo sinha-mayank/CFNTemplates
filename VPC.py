@@ -27,6 +27,7 @@ parameters = {
 
 resources = {
 
+# Add a VPC with user input CIDR block
 
 	"VPC" : ec2.VPC(
 
@@ -34,14 +35,35 @@ resources = {
 					CidrBlock = Ref("CIDRVPC"),
 					EnableDnsSupport= "True",
   					EnableDnsHostnames= "True",
-  					InstanceTenancy = "default"
+  					InstanceTenancy = "default",
   					Tags = Tags(
         						IoCluster=Ref("AWS::StackName"),
         						Name=Join("-",[Ref("AWS::StackName"), "VPC" ])
-    						 ),
+    						 )
 
 
-				   )
+				   ),
+
+# Add InternetGateway	
+	"IGW" : ec2.InternetGateway(
+
+					"IGW",
+					Tags = Tags(
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"IGW"])
+
+								)			
+
+								),
+# Attach IGW to VPC
+
+	"IGWAttachVPC" : ec2.VPCGatewayAttachment(
+
+					"IGWAttachVPC",
+					VpcId = Ref("VPC"),
+					InternetGatewayId = Ref("IGW")
+
+											  )
 
 			}
 
