@@ -1,8 +1,24 @@
 {
+    "Conditions": {
+        "CreatePrivateSubnet1ACondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "CreatePrivateSubnet1A"
+                },
+                "True"
+            ]
+        }
+    },
     "Parameters": {
         "AvailabilityZone1": {
             "Default": "us-west-2a",
             "Description": "Select the first AvailabilityZone",
+            "Type": "String"
+        },
+        "CIDRPrivateSubnet1A": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$",
+            "Default": "10.0.0.0/19",
+            "Description": "Enter the CIDR block for Private Subnet 1A",
             "Type": "String"
         },
         "CIDRPublicSubnet1": {
@@ -16,9 +32,29 @@
             "Default": "10.0.0.0/16",
             "Description": "Enter the CIDR Range for the VPC to be created",
             "Type": "String"
+        },
+        "CreatePrivateSubnet1A": {
+            "AllowedValues": [
+                "True",
+                "False"
+            ],
+            "Default": "False",
+            "Description": "Select True or False, for creating Private Subnet 1A in AZ1",
+            "Type": "String"
         }
     },
     "Resources": {
+        "AttachPublicSubnet1toRouteTable": {
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicSubnetRouteTable"
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                }
+            },
+            "Type": "AWS::EC2::SubnetRouteTableAssociation"
+        },
         "IGW": {
             "Properties": {
                 "Tags": [
@@ -57,6 +93,65 @@
             },
             "Type": "AWS::EC2::VPCGatewayAttachment"
         },
+        "NAT1EIP": {
+            "DependsOn": "IGWAttachVPC",
+            "Properties": {
+                "Domain": "vpc"
+            },
+            "Type": "AWS::EC2::EIP"
+        },
+        "NATGateway1": {
+            "DependsOn": "IGWAttachVPC",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NAT1EIP",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                }
+            },
+            "Type": "AWS::EC2::NatGateway"
+        },
+        "PrivateSubnet1A": {
+            "Condition": "CreatePrivateSubnet1ACondition",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Ref": "AvailabilityZone1"
+                },
+                "CidrBlock": {
+                    "Ref": "CIDRPrivateSubnet1A"
+                },
+                "Tags": [
+                    {
+                        "Key": "IoCluster",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "AWS::StackName"
+                                    },
+                                    "PrivateSubnet1A"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::Subnet"
+        },
         "PublicSubnet1": {
             "Properties": {
                 "AvailabilityZone": {
@@ -93,6 +188,49 @@
                 }
             },
             "Type": "AWS::EC2::Subnet"
+        },
+        "PublicSubnetRoute": {
+            "DependsOn": "IGWAttachVPC",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "IGW"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicSubnetRouteTable"
+                }
+            },
+            "Type": "AWS::EC2::Route"
+        },
+        "PublicSubnetRouteTable": {
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "IoCluster",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "AWS::StackName"
+                                    },
+                                    "RouteTable"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            },
+            "Type": "AWS::EC2::RouteTable"
         },
         "VPC": {
             "Properties": {
