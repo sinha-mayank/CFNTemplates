@@ -58,6 +58,26 @@ parameters = {
 					Default = "10.0.0.0/19",
 					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
 
+									),
+
+	"CreatePrivateSubnet1B" : Parameter(
+
+					"CreatePrivateSubnet1B",
+					Description = "Select True or False, for creating Private Subnet 1B in AZ1",
+					Type = "String",
+					AllowedValues = ["True","False"],
+					Default = "False"
+
+										),
+
+	"CIDRPrivateSubnet1B" : Parameter(
+
+					"CIDRPrivateSubnet1B",
+					Description = "Enter the CIDR block for Private Subnet 1B",
+					Type = "String",
+					Default = "10.0.192.0/21",
+					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
+
 									)
 
 
@@ -65,7 +85,8 @@ parameters = {
 
 conditions = {
 	
-	"CreatePrivateSubnet1ACondition" : Equals(Ref("CreatePrivateSubnet1A"),"True")
+	"CreatePrivateSubnet1ACondition" : Equals(Ref("CreatePrivateSubnet1A"),"True"),
+	"CreatePrivateSubnet1BCondition" : Equals(Ref("CreatePrivateSubnet1B"),"True")
 
 
 
@@ -245,7 +266,107 @@ resources = {
 						RouteTableId = Ref("PrivateSubnet1ARouteTable")	
 
 
+																			),
+
+# Create Private Subnet 1B
+
+	"PrivateSubnet1B" : ec2.Subnet(
+
+						"PrivateSubnet1B",
+						Condition = "CreatePrivateSubnet1BCondition",
+						VpcId = Ref("VPC"),
+						AvailabilityZone = Ref("AvailabilityZone1"),
+						CidrBlock = Ref("CIDRPrivateSubnet1B"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet1B"])
+
+								)
+
+								),
+
+# Private Subnet 1B route Table
+
+	"PrivateSubnet1BRouteTable" : ec2.RouteTable(
+
+						"PrivateSubnet1BRouteTable",
+						Condition = "CreatePrivateSubnet1BCondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"PrivateSubnet1BRouteTable"])
+
+								)
+
+												),
+# Create route in PrivateSubnet1B Route Table
+
+	"PrivateSubnet1BRoute" : ec2.Route(
+
+						"PrivateSubnet1BRoute",
+						Condition = "CreatePrivateSubnet1BCondition",
+						DependsOn = "PrivateSubnet1BRouteTable",
+						RouteTableId = Ref("PrivateSubnet1BRouteTable"),
+						DestinationCidrBlock = "0.0.0.0/0",
+						NatGatewayId = Ref("NATGateway1")
+
+									),
+# Associate private subnet 1B with the route table
+
+	"PrivateSubnet1BRouteTableAssociation" : ec2.SubnetRouteTableAssociation(
+
+						"PrivateSubnet1BRouteTableAssociation",
+						Condition = "CreatePrivateSubnet1BCondition",
+						DependsOn = "PrivateSubnet1BRoute",
+						SubnetId = Ref("PrivateSubnet1B"),
+						RouteTableId = Ref("PrivateSubnet1ARouteTable")	
+
+
+																			),
+# Create A NACL for Private Subnet 1B
+
+	"PrivateSubnet1BNetworkAcl" : ec2.NetworkAcl(
+
+						"PrivateSubnet1BNetworkAcl",
+						Condition = "CreatePrivateSubnet1BCondition",
+						VpcId = Ref("VPC"),
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"NACLPrivateSubnet1B"])
+
+								)
+
+
+												),
+# Create Inbound rules for NACL connected to Private Subnet 1B
+
+	"PrivateSubnet1BNetworkAclEntryInbound" : ec2.NetworkAclEntry(
+
+						"PrivateSubnet1BNetworkAclEntryInbound",
+						Condition = "CreatePrivateSubnet1BCondition",
+						CidrBlock = "10.0.0.0/16",
+						Egress = "true",
+						NetworkAclId = Ref("PrivateSubnet1BNetworkAcl"),
+						Protocol = "-1",
+						RuleAction = "allow",
+						RuleNumber = "100"
+
+																),
+
+# Associate the created NACL with the Private Subnet 1B
+
+	"PrivateSubnet1BNetworkAclAssociation" : ec2.SubnetNetworkAclAssociation(
+
+						"PrivateSubnet1BNetworkAclAssociation",
+						SubnetId = Ref("PrivateSubnet1B"),
+						NetworkAclId = Ref("PrivateSubnet1BNetworkAcl")
+
 																			)
+
+
 			}
 
 
