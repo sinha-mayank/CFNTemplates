@@ -171,7 +171,7 @@ conditions = {
 	
 	"CreatePrivateSubnet1ACondition" : Equals(Ref("CreatePrivateSubnet1A"),"True"),
 	"CreatePrivateSubnet1BCondition" : Equals(Ref("CreatePrivateSubnet1B"),"True"),
-
+	"NAT1EIPCondition" : Or(Condition("CreatePrivateSubnet1ACondition"),Condition("CreatePrivateSubnet1BCondition")),
 	"CreatePublicSubnet2Condition" : Equals(Ref("CreatePublicSubnet2"),"True"),
 	"CreatePrivateSubnet2ACondition" : Equals(Ref("CreatePrivateSubnet2A"),"True"),
 	"CreatePrivateSubnet2BCondition" : Equals(Ref("CreatePrivateSubnet2B"),"True"),
@@ -299,11 +299,12 @@ resources = {
 
 								),
 
-# Create NAT Elsatic IP
+# Create NAT Elastic IP
 
 	"NAT1EIP" : ec2.EIP(
 
 						"NAT1EIP",
+						Condition = "NAT1EIPCondition",
 						DependsOn = "IGWAttachVPC",
 						Domain = "vpc"
 
@@ -314,6 +315,7 @@ resources = {
 
 
 						"NATGateway1",
+						Condition = "NAT1EIPCondition",
 						DependsOn = "IGWAttachVPC",
 						SubnetId = Ref("PublicSubnet1"),
 						AllocationId = GetAtt("NAT1EIP","AllocationId")
@@ -413,7 +415,7 @@ resources = {
 						Condition = "CreatePrivateSubnet1BCondition",
 						DependsOn = "PrivateSubnet1BRoute",
 						SubnetId = Ref("PrivateSubnet1B"),
-						RouteTableId = Ref("PrivateSubnet1ARouteTable")	
+						RouteTableId = Ref("PrivateSubnet1BRouteTable")	
 
 
 																			),
@@ -453,6 +455,7 @@ resources = {
 	"PrivateSubnet1BNetworkAclAssociation" : ec2.SubnetNetworkAclAssociation(
 
 						"PrivateSubnet1BNetworkAclAssociation",
+						Condition = "CreatePrivateSubnet1BCondition",
 						SubnetId = Ref("PrivateSubnet1B"),
 						NetworkAclId = Ref("PrivateSubnet1BNetworkAcl")
 
