@@ -23,6 +23,7 @@ If value is left as "false" in Parameter section then specified resource will no
 from troposphere import Base64, GetAtt, Equals, And, Or, Condition
 from troposphere import Parameter, Output, Ref, Template, Tags, Join
 import troposphere.ec2 as ec2
+from troposphere.ec2 import SecurityGroupRule, NetworkInterfaceProperty
 
 
 parameters = {
@@ -161,7 +162,44 @@ parameters = {
 					Default = "10.0.200.0/21",
 					AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$"
 
-									)
+									),
+
+	"EC2KeyPairName"	: Parameter(
+
+
+					"EC2KeyPairName",
+					Description = "Select the KEY Pair to be used for connecting the Instance",
+					Type = "AWS::EC2::KeyPair::KeyName",
+
+								),
+
+	"InstanceType"	: Parameter(
+
+					"InstanceType",
+					Description = "Select the appropriate instance type of your choice",
+					Type = "String",
+					AllowedValues = [ "t2.nano",
+									  "t2.micro",
+                					  "t2.small",
+              						  "t2.medium",
+        					          "t2.large",
+             					      "m3.medium",
+              						  "m3.large",
+             					      "m4.large"
+
+             					    ],
+             		Default = "t2.micro"
+
+								),
+
+	"SSHLocationBastion"	: Parameter(
+
+							"SSHLocationBastion",
+							Type = "String",
+							AllowedPattern = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/([0-9]|[1-2][0-9]|3[0-2]))$",
+							Default = "0.0.0.0/0" 
+
+									   )
 
 
 
@@ -669,7 +707,69 @@ resources = {
 						SubnetId = Ref("PrivateSubnet2B"),
 						NetworkAclId = Ref("PrivateSubnet2BNetworkAcl")
 
-																			)
+																			),
+
+# Instance Security Group
+
+	"InstanceSecurityGroup"	: ec2.SecurityGroup(
+
+						"InstanceSecurityGroup",
+						GroupDescription = "This security group provides access to Bastion Host from given CIDR range",
+						VpcId = Ref("VPC"),
+						SecurityGroupIngress = [
+													 SecurityGroupRule(
+               										 IpProtocol='tcp',
+               										 FromPort='22',
+                									 ToPort='22',
+               										 CidrIp=Ref("SSHLocationBastion")),
+
+               										 SecurityGroupRule(
+               										 IpProtocol='tcp',
+               										 FromPort='80',
+                									 ToPort='80',
+               										 CidrIp= "0.0.0.0/0"),
+											   ],
+						Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"SecurityGroup"])
+
+								)
+
+
+												),
+
+												
+
+# Start an instance in Public Subnet 1
+
+	"BastionHost"	: ec2.Instance(
+
+
+						"BastionHost",
+						ImageId = "ami-ffbdd790",
+						InstanceType = Ref("InstanceType"),
+						KeyName = Ref("EC2KeyPairName"),
+						#SubnetId = Ref("PublicSubnet1"),
+						NetworkInterfaces=[
+           								 NetworkInterfaceProperty(
+               									 GroupSet = [Ref("InstanceSecurityGroup")],
+               									 AssociatePublicIpAddress = "True",
+               									 DeviceIndex="0",
+               									 DeleteOnTermination="True",
+               									 SubnetId = Ref("PublicSubnet1") )
+           								 ],
+           				Tags = Tags(
+
+								IoCluster = Ref("AWS::StackName"),
+								Name = Join("-",[Ref("AWS::StackName"),"BastionHost"])
+
+								)
+
+
+												)								  
+
+           							
 
 
 
